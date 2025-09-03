@@ -83,17 +83,16 @@ def _local_proposal(
     edge_types = edge_types.clone()
     n = node_types.size(0)
 
-    if random.random() < 0.5:
+    if n == 0:
+        return node_types, edge_types
+
+    if n > 1 and random.random() >= 0.5:
+        i, j = random.sample(range(n), 2)
+        val = random.randrange(num_edge_types)
+        edge_types[i, j] = edge_types[j, i] = val
+    else:
         idx = random.randrange(n)
         node_types[idx] = random.randrange(num_node_types)
-    else:
-        i = random.randrange(n)
-        j = random.randrange(n)
-        while j == i:
-            j = random.randrange(n)
-        val = random.randrange(num_edge_types)
-        edge_types[i, j] = val
-        edge_types[j, i] = val
     return node_types, edge_types
 
 
