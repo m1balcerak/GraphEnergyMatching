@@ -58,7 +58,10 @@ def main(cfg: DictConfig):
     device = torch.device("cpu")
 
     init_graphs = sampler.initialize_random_graphs(
-        batch_size=cfg.train.batch_size, dataset_info=dataset_infos, device=device
+        batch_size=cfg.train.batch_size,
+        dataset_info=dataset_infos,
+        device=device,
+        transition=cfg.model.transition,
     )
 
     molecules = []
