@@ -61,7 +61,14 @@ def main(cfg: DictConfig):
     edge_types = torch.argmax(dense.E[0, :n, :n], dim=-1)
 
     sampled_nodes, sampled_edges = sampler.mcmc_sample(
-        model, dataset_infos, node_types, edge_types, steps=10, device=torch.device("cpu")
+        model,
+        dataset_infos,
+        node_types,
+        edge_types,
+        extra_features,
+        domain_features,
+        steps=10,
+        device=torch.device("cpu"),
     )
 
     molecules = [(sampled_nodes, sampled_edges)]

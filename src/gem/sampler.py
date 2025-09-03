@@ -12,6 +12,8 @@ def _energy(
     edge_types: torch.Tensor,
     dataset_info,
     device: torch.device,
+    extra_features,
+    domain_features,
 ) -> float:
     """Compute scalar energy of a graph using the transformer model."""
     n = node_types.shape[0]
@@ -27,11 +29,46 @@ def _energy(
     X_pad[0, :n] = X
     E_pad[0, :n, :n] = E
 
-    y = torch.zeros((1, dataset_info.input_dims["y"]), device=device)
+    y = torch.zeros((1, dataset_info.output_dims["y"]), device=device)
     node_mask = torch.zeros((1, max_n), device=device)
     node_mask[0, :n] = 1
+    t = torch.zeros((1, 1), device=device)
 
-    _, energy = model(X_pad, E_pad, y, node_mask, return_energy=True)
+    noisy_data = {
+        "X_t": X_pad,
+        "E_t": E_pad,
+        "y_t": y,
+        "node_mask": node_mask,
+        "t": t,
+    }
+
+    extra_feat = extra_features(noisy_data)
+    extra_mol_feat = domain_features(noisy_data)
+
+    extra_X = torch.cat((extra_feat.X, extra_mol_feat.X), dim=-1)
+    extra_E = torch.cat((extra_feat.E, extra_mol_feat.E), dim=-1)
+    extra_y = torch.cat((extra_feat.y, extra_mol_feat.y), dim=-1)
+    extra_y = torch.cat((extra_y, t), dim=1)
+
+    X_input = torch.cat((X_pad, extra_X), dim=2)
+    E_input = torch.cat((E_pad, extra_E), dim=3)
+    y_input = torch.cat((y, extra_y), dim=1)
+
+    if X_input.shape[-1] < dataset_info.input_dims["X"]:
+        pad = dataset_info.input_dims["X"] - X_input.shape[-1]
+        X_input = torch.cat(
+            (X_input, torch.zeros(1, max_n, pad, device=device)), dim=-1
+        )
+    if E_input.shape[-1] < dataset_info.input_dims["E"]:
+        pad = dataset_info.input_dims["E"] - E_input.shape[-1]
+        E_input = torch.cat(
+            (E_input, torch.zeros(1, max_n, max_n, pad, device=device)), dim=-1
+        )
+    if y_input.shape[-1] < dataset_info.input_dims["y"]:
+        pad = dataset_info.input_dims["y"] - y_input.shape[-1]
+        y_input = torch.cat((y_input, torch.zeros(1, pad, device=device)), dim=-1)
+
+    _, energy = model(X_input, E_input, y_input, node_mask, return_energy=True)
     return energy.item()
 
 
@@ -65,6 +102,8 @@ def mcmc_sample(
     dataset_info,
     node_types: torch.Tensor,
     edge_types: torch.Tensor,
+    extra_features,
+    domain_features,
     steps: int = 10,
     device: torch.device = torch.device("cpu"),
 ):
@@ -74,12 +113,28 @@ def mcmc_sample(
     num_node_types = dataset_info.output_dims["X"]
     num_edge_types = dataset_info.output_dims["E"]
 
-    current_energy = _energy(model, node_types, edge_types, dataset_info, device)
+    current_energy = _energy(
+        model,
+        node_types,
+        edge_types,
+        dataset_info,
+        device,
+        extra_features,
+        domain_features,
+    )
     for _ in range(steps):
         prop_node, prop_edge = _local_proposal(
             node_types, edge_types, num_node_types, num_edge_types
         )
-        prop_energy = _energy(model, prop_node, prop_edge, dataset_info, device)
+        prop_energy = _energy(
+            model,
+            prop_node,
+            prop_edge,
+            dataset_info,
+            device,
+            extra_features,
+            domain_features,
+        )
         if math.log(random.random()) < current_energy - prop_energy:
             node_types, edge_types = prop_node, prop_edge
             current_energy = prop_energy
