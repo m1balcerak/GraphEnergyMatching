@@ -15,11 +15,12 @@ from models.transformer_model import GraphTransformer
 from models.extra_features import ExtraFeatures
 from models.extra_features_molecular import ExtraMolecularFeatures
 from . import sampler
+import utils
 
 
-@hydra.main(version_base="1.3", config_path="../../configs", config_name="config")
+@hydra.main(version_base="1.3", config_path="../../configs", config_name="gem")
 def main(cfg: DictConfig):
-    """Placeholder training loop for the GEM energy model."""
+    """Train the GEM energy model with contrastive divergence."""
     pl.seed_everything(cfg.train.seed)
 
     datamodule = qm9_dataset.QM9DataModule(cfg)
@@ -56,6 +57,69 @@ def main(cfg: DictConfig):
         act_fn_in=nn.ReLU(),
         act_fn_out=nn.ReLU(),
     ).to(device)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
+
+    model.train()
+    for epoch in range(cfg.train.n_epochs):
+        total_accepts = 0
+        total_steps = 0
+        for batch in datamodule.train_dataloader():
+            dense_data, node_mask = utils.to_dense(
+                batch.x, batch.edge_index, batch.edge_attr, batch.batch
+            )
+            graphs = dense_data.mask(node_mask, collapse=True).split(node_mask)
+
+            loss = 0.0
+            for graph in graphs:
+                node_types = graph.X.to(device).long()
+                edge_types = graph.E.to(device).long()
+
+                pos_energy = sampler._energy(
+                    model,
+                    node_types,
+                    edge_types,
+                    dataset_infos,
+                    device,
+                    extra_features,
+                    domain_features,
+                    detach=False,
+                )
+
+                neg_nodes, neg_edges, n_acc, n_steps = sampler.mcmc_sample(
+                    model,
+                    dataset_infos,
+                    node_types,
+                    edge_types,
+                    extra_features,
+                    domain_features,
+                    steps=cfg.train.cd_steps,
+                    device=device,
+                )
+                total_accepts += n_acc
+                total_steps += n_steps
+
+                neg_energy = sampler._energy(
+                    model,
+                    neg_nodes.to(device),
+                    neg_edges.to(device),
+                    dataset_infos,
+                    device,
+                    extra_features,
+                    domain_features,
+                    detach=False,
+                )
+
+                loss = loss + (pos_energy - neg_energy)
+
+            loss = loss / max(len(graphs), 1)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        acc_rate = total_accepts / max(total_steps, 1)
+        print(f"Epoch {epoch + 1}/{cfg.train.n_epochs} - Loss: {loss.item():.4f} - Acceptance: {acc_rate:.3f}")
+
     model.eval()
 
     init_graphs = sampler.initialize_random_graphs(
@@ -67,14 +131,14 @@ def main(cfg: DictConfig):
 
     molecules = []
     for node_types, edge_types in init_graphs:
-        sampled_nodes, sampled_edges = sampler.mcmc_sample(
+        sampled_nodes, sampled_edges, _, _ = sampler.mcmc_sample(
             model,
             dataset_infos,
             node_types,
             edge_types,
             extra_features,
             domain_features,
-            steps=10,
+            steps=cfg.sample.sample_steps,
             device=device,
         )
         molecules.append((sampled_nodes, sampled_edges))

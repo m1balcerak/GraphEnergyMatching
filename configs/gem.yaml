@@ -1,0 +1,20 @@
+defaults:
+  - _self_
+  - general: general_default
+  - model: discrete
+  - train: train_default
+  - dataset: qm9
+  - sample: sample_default
+
+# Dedicated settings for GEM training and sampling
+general:
+  name: gem_experiment
+  gpus: 0
+
+train:
+  cd_steps: 10
+  n_epochs: 1
+  batch_size: 32
+
+sample:
+  sample_steps: 10
