@@ -1,6 +1,6 @@
 import math
 import random
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -16,8 +16,17 @@ def _energy(
     device: torch.device,
     extra_features,
     domain_features,
-) -> float:
-    """Compute scalar energy of a graph using the transformer model."""
+    detach: bool = True,
+) -> Union[torch.Tensor, float]:
+    """Compute scalar energy of a graph using the transformer model.
+
+    Parameters
+    ----------
+    detach: bool, default True
+        If ``True`` the returned energy is detached from the computation
+        graph and converted to a Python float. When ``False`` a tensor is
+        returned, which allows gradients to flow for training.
+    """
     # Pad to the size of this graph (batch max) instead of the dataset-wide
     # maximum number of nodes used during training.
     n = node_types.shape[0]
@@ -69,7 +78,9 @@ def _energy(
         y_input = torch.cat((y_input, torch.zeros(1, pad, device=device)), dim=-1)
 
     _, energy = model(X_input, E_input, y_input, node_mask, return_energy=True)
-    return energy.item()
+    if detach:
+        return energy.detach().item()
+    return energy
 
 
 def _local_proposal(
@@ -142,7 +153,16 @@ def mcmc_sample(
     steps: int = 10,
     device: torch.device = torch.device("cpu"),
 ):
-    """Run a simple MCMC chain starting from the provided graph."""
+    """Run a simple MCMC chain starting from the provided graph.
+
+    Returns
+    -------
+    tuple
+        ``(node_types, edge_types, n_accept, n_steps)`` where ``n_accept``
+        is the number of accepted proposals during the chain and
+        ``n_steps`` is the total number of MCMC iterations. These values
+        can be used to compute acceptance rates.
+    """
     node_types = node_types.to(device)
     edge_types = edge_types.to(device)
     num_node_types = dataset_info.output_dims["X"]
@@ -156,7 +176,9 @@ def mcmc_sample(
         device,
         extra_features,
         domain_features,
+        detach=True,
     )
+    n_accept = 0
     for _ in range(steps):
         prop_node, prop_edge = _local_proposal(
             node_types, edge_types, num_node_types, num_edge_types
@@ -169,9 +191,11 @@ def mcmc_sample(
             device,
             extra_features,
             domain_features,
+            detach=True,
         )
         if math.log(random.random()) < current_energy - prop_energy:
             node_types, edge_types = prop_node, prop_edge
             current_energy = prop_energy
+            n_accept += 1
 
-    return node_types.cpu(), edge_types.cpu()
+    return node_types.cpu(), edge_types.cpu(), n_accept, steps
