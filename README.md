@@ -90,6 +90,20 @@ python main.py +experiment=<dataset> dataset=<dataset>
 - **QM9 (with H):** `+experiment=qm9_with_h dataset=qm9`
 - **TLS (conditional):** `+experiment=tls dataset=tls`
 
+### GEM energy model
+
+We provide a minimal example of an energy-based variant, **GEM** (Graph Energy Matching). It reuses the transformer backbone and
+adds a scalar energy computed by summing all logits. The current implementation performs no training but demonstrates data
+handling, local MCMC sampling and metric evaluation.
+
+```bash
+python src/gem/train_gem.py dataset=qm9
+```
+
+The command above builds the energy model for QM9, runs a short uninformed MCMC chain with single-edit proposals and evaluates the
+generated molecule using the same metrics as DeFoG. Other datasets supported by DeFoG can be selected by overriding the
+`dataset` argument.
+
 ---
 
 ## 📊 Evaluation
