@@ -1,6 +1,6 @@
 import math
 import random
-from typing import Tuple
+from typing import List, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -94,6 +94,37 @@ def _local_proposal(
         idx = random.randrange(n)
         node_types[idx] = random.randrange(num_node_types)
     return node_types, edge_types
+
+
+def initialize_random_graphs(
+    batch_size: int,
+    dataset_info,
+    device: torch.device = torch.device("cpu"),
+) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+    """Sample a batch of random graphs used as MCMC initial states.
+
+    For each graph, the number of nodes is drawn from the dataset's node
+    distribution. Node and edge types are then sampled uniformly (the edge
+    type ``0`` corresponds to no bond).
+    """
+
+    graphs: List[Tuple[torch.Tensor, torch.Tensor]] = []
+    num_node_types = dataset_info.output_dims["X"]
+    num_edge_types = dataset_info.output_dims["E"]
+    node_pmf = dataset_info.n_nodes.float()
+    node_pmf = node_pmf / node_pmf.sum()
+
+    for _ in range(batch_size):
+        n = torch.multinomial(node_pmf, 1).item()
+        n = max(int(n), 1)  # avoid empty graphs
+        nodes = torch.randint(0, num_node_types, (n,), device=device)
+        edges = torch.randint(0, num_edge_types, (n, n), device=device)
+        edges = torch.triu(edges, diagonal=1)
+        edges = edges + edges.T
+        edges.fill_diagonal_(0)
+        graphs.append((nodes.cpu(), edges.cpu()))
+
+    return graphs
 
 
 def mcmc_sample(
