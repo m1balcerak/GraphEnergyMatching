@@ -52,7 +52,7 @@ class ExtraFeatures:
         elif self.features_type == "rrwp":
             E = noisy_data["E_t"].float()[..., 1:].sum(-1)  # bs, n, n
             rrwp_edge_attr = self.RRWP(E, k=self.rrwp_steps)
-            diag_index = torch.arange(rrwp_edge_attr.shape[1])
+            diag_index = torch.arange(rrwp_edge_attr.shape[1], device=rrwp_edge_attr.device)
             rrwp_node_attr = rrwp_edge_attr[:, diag_index, diag_index, :]
             self.eigenfeatures = EigenFeatures(mode="all")
 
@@ -73,7 +73,7 @@ class ExtraFeatures:
             rrwp_edge_attr_wo_norm = rrwp_edge_attr_wo_norm / max_value
 
             rrwp_edge_attr = torch.cat((rrwp_edge_attr, rrwp_edge_attr_wo_norm), dim=-1)
-            diag_index = torch.arange(rrwp_edge_attr.shape[1])
+            diag_index = torch.arange(rrwp_edge_attr.shape[1], device=rrwp_edge_attr.device)
             rrwp_node_attr = rrwp_edge_attr[:, diag_index, diag_index, :]
             # self.eigenfeatures = EigenFeatures(mode='all')
 
@@ -86,7 +86,7 @@ class ExtraFeatures:
         elif self.features_type == "rrwp_only":
             E = noisy_data["E_t"].float()[..., 1:].sum(-1)  # bs, n, n
             rrwp_edge_attr = self.RRWP(E, k=self.rrwp_steps)
-            diag_index = torch.arange(rrwp_edge_attr.shape[1])
+            diag_index = torch.arange(rrwp_edge_attr.shape[1], device=rrwp_edge_attr.device)
             rrwp_node_attr = rrwp_edge_attr[:, diag_index, diag_index, :]
 
             return utils.PlaceHolder(
@@ -98,7 +98,7 @@ class ExtraFeatures:
         elif self.features_type == "rrwp_comp":
             E = noisy_data["E_t"].float()[..., 1:].sum(-1)  # bs, n, n
             rrwp_edge_attr = self.RRWP(E, k=int(self.rrwp_steps / 2))
-            diag_index = torch.arange(rrwp_edge_attr.shape[1])
+            diag_index = torch.arange(rrwp_edge_attr.shape[1], device=rrwp_edge_attr.device)
             rrwp_node_attr = rrwp_edge_attr[:, diag_index, diag_index, :]
 
             comp_E = 1 - noisy_data["E_t"].float()[..., 1:].sum(-1)  # bs, n, n

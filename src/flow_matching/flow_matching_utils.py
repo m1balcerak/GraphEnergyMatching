@@ -39,7 +39,9 @@ def sample_discrete_feature_noise(limit_dist, node_mask):
 
     # Get upper triangular part of edge noise, without main diagonal
     upper_triangular_mask = torch.zeros_like(U_E)
-    indices = torch.triu_indices(row=U_E.size(1), col=U_E.size(2), offset=1)
+    indices = torch.triu_indices(
+        row=U_E.size(1), col=U_E.size(2), offset=1, device=U_E.device
+    )
     upper_triangular_mask[:, indices[0], indices[1], :] = 1
 
     U_E = U_E * upper_triangular_mask
@@ -72,7 +74,7 @@ def sample_discrete_features(probX, probE, node_mask, mask=False):
     # Noise E
     # The masked rows should define probability distributions as well
     inverse_edge_mask = ~(node_mask.unsqueeze(1) * node_mask.unsqueeze(2))
-    diag_mask = torch.eye(n).unsqueeze(0).expand(bs, -1, -1)
+    diag_mask = torch.eye(n, device=probE.device).unsqueeze(0).expand(bs, -1, -1)
 
     probE[inverse_edge_mask] = 1 / probE.shape[-1]
     probE[diag_mask.bool()] = 1 / probE.shape[-1]
