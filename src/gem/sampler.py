@@ -18,22 +18,20 @@ def _energy(
     domain_features,
 ) -> float:
     """Compute scalar energy of a graph using the transformer model."""
+    # Pad to the size of this graph (batch max) instead of the dataset-wide
+    # maximum number of nodes used during training.
     n = node_types.shape[0]
-    max_n = dataset_info.max_n_nodes
     num_node_types = dataset_info.output_dims["X"]
     num_edge_types = dataset_info.output_dims["E"]
 
     X = F.one_hot(node_types, num_classes=num_node_types).float()
     E = F.one_hot(edge_types, num_classes=num_edge_types).float()
 
-    X_pad = torch.zeros((1, max_n, num_node_types), device=device)
-    E_pad = torch.zeros((1, max_n, max_n, num_edge_types), device=device)
-    X_pad[0, :n] = X
-    E_pad[0, :n, :n] = E
+    X_pad = X.unsqueeze(0).to(device)
+    E_pad = E.unsqueeze(0).to(device)
 
     y = torch.zeros((1, dataset_info.output_dims["y"]), device=device)
-    node_mask = torch.zeros((1, max_n), device=device)
-    node_mask[0, :n] = 1
+    node_mask = torch.ones((1, n), device=device)
     t = torch.zeros((1, 1), device=device)
 
     noisy_data = {
@@ -59,12 +57,12 @@ def _energy(
     if X_input.shape[-1] < dataset_info.input_dims["X"]:
         pad = dataset_info.input_dims["X"] - X_input.shape[-1]
         X_input = torch.cat(
-            (X_input, torch.zeros(1, max_n, pad, device=device)), dim=-1
+            (X_input, torch.zeros(1, n, pad, device=device)), dim=-1
         )
     if E_input.shape[-1] < dataset_info.input_dims["E"]:
         pad = dataset_info.input_dims["E"] - E_input.shape[-1]
         E_input = torch.cat(
-            (E_input, torch.zeros(1, max_n, max_n, pad, device=device)), dim=-1
+            (E_input, torch.zeros(1, n, n, pad, device=device)), dim=-1
         )
     if y_input.shape[-1] < dataset_info.input_dims["y"]:
         pad = dataset_info.input_dims["y"] - y_input.shape[-1]
