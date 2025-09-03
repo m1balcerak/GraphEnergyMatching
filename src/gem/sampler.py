@@ -4,6 +4,8 @@ from typing import List, Tuple
 
 import torch
 import torch.nn.functional as F
+from flow_matching.noise_distribution import NoiseDistribution
+from flow_matching import flow_matching_utils
 
 
 def _energy(
@@ -100,29 +102,34 @@ def initialize_random_graphs(
     batch_size: int,
     dataset_info,
     device: torch.device = torch.device("cpu"),
+    transition: str = "marginal",
 ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
     """Sample a batch of random graphs used as MCMC initial states.
 
-    For each graph, the number of nodes is drawn from the dataset's node
-    distribution. Node and edge types are then sampled uniformly (the edge
-    type ``0`` corresponds to no bond).
+    The number of nodes is drawn from the empirical training-set distribution
+    and node/edge types are sampled from the reference (noise) distribution
+    used in DEFoG.
     """
 
-    graphs: List[Tuple[torch.Tensor, torch.Tensor]] = []
-    num_node_types = dataset_info.output_dims["X"]
-    num_edge_types = dataset_info.output_dims["E"]
-    node_pmf = dataset_info.n_nodes.float()
-    node_pmf = node_pmf / node_pmf.sum()
+    # Sample number of nodes from empirical distribution
+    n_nodes = dataset_info.nodes_dist.sample_n(batch_size, device)
+    n_max = torch.max(n_nodes).item()
+    arange = torch.arange(n_max, device=device).unsqueeze(0).expand(batch_size, -1)
+    node_mask = arange < n_nodes.unsqueeze(1)
 
-    for _ in range(batch_size):
-        n = torch.multinomial(node_pmf, 1).item()
-        n = max(int(n), 1)  # avoid empty graphs
-        nodes = torch.randint(0, num_node_types, (n,), device=device)
-        edges = torch.randint(0, num_edge_types, (n, n), device=device)
-        edges = torch.triu(edges, diagonal=1)
-        edges = edges + edges.T
-        edges.fill_diagonal_(0)
-        graphs.append((nodes.cpu(), edges.cpu()))
+    # Sample node and edge types from reference noise distribution
+    noise_dist = NoiseDistribution(transition, dataset_info)
+    limit_dist = noise_dist.get_limit_dist()
+    z_T = flow_matching_utils.sample_discrete_feature_noise(
+        limit_dist=limit_dist, node_mask=node_mask
+    )
+
+    graphs: List[Tuple[torch.Tensor, torch.Tensor]] = []
+    for i in range(batch_size):
+        n = n_nodes[i].item()
+        node_types = torch.argmax(z_T.X[i, :n], dim=-1)
+        edge_types = torch.argmax(z_T.E[i, :n, :n], dim=-1)
+        graphs.append((node_types.cpu(), edge_types.cpu()))
 
     return graphs
 
