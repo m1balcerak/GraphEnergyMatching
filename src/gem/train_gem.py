@@ -45,6 +45,8 @@ def main(cfg: DictConfig):
     )
     print("Reference metrics:", dataset_infos.ref_metrics)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model = GraphTransformer(
         n_layers=cfg.model.n_layers,
         input_dims=dataset_infos.input_dims,
@@ -53,9 +55,8 @@ def main(cfg: DictConfig):
         output_dims=dataset_infos.output_dims,
         act_fn_in=nn.ReLU(),
         act_fn_out=nn.ReLU(),
-    )
+    ).to(device)
     model.eval()
-    device = torch.device("cpu")
 
     init_graphs = sampler.initialize_random_graphs(
         batch_size=cfg.train.batch_size,

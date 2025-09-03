@@ -320,7 +320,7 @@ class GraphTransformer(nn.Module):
     def forward(self, X, E, y, node_mask, return_energy: bool = False):
         bs, n = X.shape[0], X.shape[1]
 
-        diag_mask = torch.eye(n)
+        diag_mask = torch.eye(n, device=E.device)
         diag_mask = ~diag_mask.type_as(E).bool()
         diag_mask = diag_mask.unsqueeze(0).unsqueeze(-1).expand(bs, -1, -1, -1)
 
