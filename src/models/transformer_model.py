@@ -317,7 +317,7 @@ class GraphTransformer(nn.Module):
             nn.Linear(hidden_mlp_dims["y"], output_dims["y"]),
         )
 
-    def forward(self, X, E, y, node_mask):
+    def forward(self, X, E, y, node_mask, return_energy: bool = False):
         bs, n = X.shape[0], X.shape[1]
 
         diag_mask = torch.eye(n)
@@ -353,7 +353,16 @@ class GraphTransformer(nn.Module):
 
         E = 1 / 2 * (E + torch.transpose(E, 1, 2))
 
-        return utils.PlaceHolder(X=X, E=E, y=y).mask(node_mask)
+        out = utils.PlaceHolder(X=X, E=E, y=y).mask(node_mask)
+
+        if return_energy:
+            # Sum logits over all dimensions to obtain a scalar energy per graph
+            energy = out.X.sum(dim=(1, 2)) + out.E.sum(dim=(1, 2, 3))
+            if out.y is not None and out.y.numel() > 0:
+                energy = energy + out.y.sum(dim=1)
+            return out, energy
+
+        return out
 
 
 def timestep_embedding(timesteps, dim, max_period=10000):
