@@ -40,6 +40,10 @@ def main(cfg: DictConfig):
     )
 
     sampling_metrics = SamplingMolecularMetrics(dataset_infos, dataset_smiles, cfg)
+    dataset_infos.compute_reference_metrics(
+        datamodule=datamodule,
+        sampling_metrics=sampling_metrics,
+    )
 
     model = GraphTransformer(
         n_layers=cfg.model.n_layers,
