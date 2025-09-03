@@ -26,7 +26,10 @@ def main(cfg: DictConfig):
     datamodule = qm9_dataset.QM9DataModule(cfg)
     dataset_infos = qm9_dataset.QM9infos(datamodule=datamodule, cfg=cfg)
     dataset_smiles = qm9_dataset.get_smiles(
-        cfg=cfg, datamodule=datamodule, dataset_infos=dataset_infos, evaluate_datasets=False
+        cfg=cfg,
+        datamodule=datamodule,
+        dataset_infos=dataset_infos,
+        evaluate_datasets=False,
     )
 
     extra_features = ExtraFeatures(
@@ -61,6 +64,7 @@ def main(cfg: DictConfig):
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
 
     model.train()
+    iteration = 0
     for epoch in range(cfg.train.n_epochs):
         total_accepts = 0
         total_steps = 0
@@ -71,6 +75,8 @@ def main(cfg: DictConfig):
             graphs = dense_data.mask(node_mask, collapse=True).split(node_mask)
 
             loss = 0.0
+            batch_accepts = 0
+            batch_steps = 0
             for graph in graphs:
                 node_types = graph.X.to(device).long()
                 edge_types = graph.E.to(device).long()
@@ -98,6 +104,8 @@ def main(cfg: DictConfig):
                 )
                 total_accepts += n_acc
                 total_steps += n_steps
+                batch_accepts += n_acc
+                batch_steps += n_steps
 
                 neg_energy = sampler._energy(
                     model,
@@ -117,8 +125,16 @@ def main(cfg: DictConfig):
             loss.backward()
             optimizer.step()
 
-        acc_rate = total_accepts / max(total_steps, 1)
-        print(f"Epoch {epoch + 1}/{cfg.train.n_epochs} - Loss: {loss.item():.4f} - Acceptance: {acc_rate:.3f}")
+            acc_rate = batch_accepts / max(batch_steps, 1)
+            print(
+                f"Iteration {iteration + 1} - Loss: {loss.item():.4f} - Acceptance: {acc_rate:.3f}"
+            )
+            iteration += 1
+
+        epoch_acc_rate = total_accepts / max(total_steps, 1)
+        print(
+            f"Epoch {epoch + 1}/{cfg.train.n_epochs} - Loss: {loss.item():.4f} - Acceptance: {epoch_acc_rate:.3f}"
+        )
 
     model.eval()
 
