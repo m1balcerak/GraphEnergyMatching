@@ -7,7 +7,9 @@ import pytorch_lightning as pl
 import hydra
 from omegaconf import DictConfig
 
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 
 from src import utils
 from datasets import qm9_dataset
