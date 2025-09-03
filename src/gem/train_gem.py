@@ -9,7 +9,6 @@ from omegaconf import DictConfig
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src import utils
 from datasets import qm9_dataset
 from metrics.molecular_metrics import SamplingMolecularMetrics
 from models.transformer_model import GraphTransformer
@@ -44,6 +43,7 @@ def main(cfg: DictConfig):
         datamodule=datamodule,
         sampling_metrics=sampling_metrics,
     )
+    print("Reference metrics:", dataset_infos.ref_metrics)
 
     model = GraphTransformer(
         n_layers=cfg.model.n_layers,
@@ -55,27 +55,26 @@ def main(cfg: DictConfig):
         act_fn_out=nn.ReLU(),
     )
     model.eval()
+    device = torch.device("cpu")
 
-    data = datamodule.train_dataset[0]
-    dense, node_mask = utils.to_dense(
-        data.x, data.edge_index, data.edge_attr, torch.zeros(data.x.size(0), dtype=torch.long)
-    )
-    n = node_mask.sum().item()
-    node_types = torch.argmax(dense.X[0, :n], dim=-1)
-    edge_types = torch.argmax(dense.E[0, :n, :n], dim=-1)
-
-    sampled_nodes, sampled_edges = sampler.mcmc_sample(
-        model,
-        dataset_infos,
-        node_types,
-        edge_types,
-        extra_features,
-        domain_features,
-        steps=10,
-        device=torch.device("cpu"),
+    init_graphs = sampler.initialize_random_graphs(
+        batch_size=cfg.train.batch_size, dataset_info=dataset_infos, device=device
     )
 
-    molecules = [(sampled_nodes, sampled_edges)]
+    molecules = []
+    for node_types, edge_types in init_graphs:
+        sampled_nodes, sampled_edges = sampler.mcmc_sample(
+            model,
+            dataset_infos,
+            node_types,
+            edge_types,
+            extra_features,
+            domain_features,
+            steps=10,
+            device=device,
+        )
+        molecules.append((sampled_nodes, sampled_edges))
+
     sampling_metrics(
         molecules=molecules,
         ref_metrics=dataset_infos.ref_metrics,
@@ -85,6 +84,7 @@ def main(cfg: DictConfig):
         local_rank=0,
         test=True,
     )
+    print("Reference metrics:", dataset_infos.ref_metrics)
 
 
 if __name__ == "__main__":
