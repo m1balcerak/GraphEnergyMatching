@@ -10,9 +10,13 @@ from rdkit.Chem.rdchem import BondType as BT
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+
+try:
+    from torch_geometric.data import Data
+except ImportError:  # pragma: no cover - for older PyG versions
+    from torch_geometric.data import DataEdgeAttr as Data
+
 from torch_geometric.data import (
-    Data,
-    DataEdgeAttr,
     InMemoryDataset,
     download_url,
     extract_zip,
@@ -100,7 +104,6 @@ class QM9Dataset(InMemoryDataset):
             self.file_idx = 2
         self.remove_h = remove_h
         super().__init__(root, transform, pre_transform, pre_filter)
-        torch.serialization.add_safe_globals([DataEdgeAttr])
         self.data, self.slices = torch.load(
             self.processed_paths[self.file_idx],
             weights_only=False,
