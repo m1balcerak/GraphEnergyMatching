@@ -1,5 +1,5 @@
 # proposals/random_proposal.py, do not delete this line
-from typing import List, Sequence, Tuple
+from typing import List, Sequence, Tuple, Optional
 import random
 import torch
 
@@ -57,6 +57,10 @@ class RandomProposal(Proposal):
         # Symmetric -> no log_q_fwd needed
         return ProposalResult(prop_nodes=prop_nodes, prop_edges=prop_edges, log_q_fwd=None, moves=None)
 
+    def needs_proposed_energy(self) -> bool:
+        # Symmetric MH requires prop_E computed by the driver
+        return True
+
     def accept(
         self,
         *,
@@ -66,13 +70,14 @@ class RandomProposal(Proposal):
         current_edges,
         prop_result: ProposalResult,
         current_E: torch.Tensor,
-        prop_E: torch.Tensor,
+        prop_E: Optional[torch.Tensor],
         extra_features,
         domain_features,
         device: torch.device,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        assert prop_E is not None, "RandomProposal requires proposed energies."
         # Symmetric MH: π(x) ∝ exp(-E)
         B = prop_E.shape[0]
-        log_u = torch.log(torch.rand(B, device=prop_E.device))
-        accept_mask = (log_u < (current_E - prop_E)).cpu()
-        return accept_mask
+        log_u = torch.log(torch.rand(B, device=prop_E.device, dtype=torch.float32))
+        accept_mask = (log_u < (current_E.float() - prop_E.float())).cpu()
+        return accept_mask, prop_E

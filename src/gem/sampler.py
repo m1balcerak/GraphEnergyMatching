@@ -35,11 +35,7 @@ def initialize_random_graphs(
     device: torch.device = torch.device("cpu"),
     transition: str = "marginal",
 ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
-    """Sample a batch of random graphs used as MCMC initial states.
-
-    The number of nodes is drawn from the empirical training-set distribution
-    and node/edge types are sampled from the reference (noise) distribution.
-    """
+    """Sample a batch of random graphs used as MCMC initial states."""
     # Sample number of nodes from empirical distribution
     n_nodes = dataset_info.nodes_dist.sample_n(batch_size, device)
     n_max = torch.max(n_nodes).item()
@@ -76,12 +72,6 @@ def mcmc_sample_batch(
 ):
     """Run parallel MCMC chains (one per graph) starting from the provided batch.
 
-    Parameters
-    ----------
-    proposal : {'random', 'gwd'}
-        - 'random': uniformly random single-edit proposal (symmetric).
-        - 'gwd'   : gradient-weighted single-edit proposal with exact MH.
-
     Returns
     -------
     tuple
@@ -105,8 +95,8 @@ def mcmc_sample_batch(
     )  # (B,)
 
     prop_impl: Proposal = make_proposal(proposal, gwd_tau=gwd_tau)
-
     total_accepts = 0
+
     for _ in range(steps):
         # === Propose ===
         prop_result = prop_impl.propose(
@@ -119,20 +109,22 @@ def mcmc_sample_batch(
             device=device,
         )
 
-        # === Score proposals ===
-        prop_E = energy_batch(
-            model=model,
-            node_types_list=prop_result.prop_nodes,
-            edge_types_list=prop_result.prop_edges,
-            dataset_info=dataset_info,
-            device=device,
-            extra_features=extra_features,
-            domain_features=domain_features,
-            detach=True,
-        )  # (B,)
+        # === Score proposals if needed by the proposal ===
+        prop_E: Optional[torch.Tensor] = None
+        if prop_impl.needs_proposed_energy():
+            prop_E = energy_batch(
+                model=model,
+                node_types_list=prop_result.prop_nodes,
+                edge_types_list=prop_result.prop_edges,
+                dataset_info=dataset_info,
+                device=device,
+                extra_features=extra_features,
+                domain_features=domain_features,
+                detach=True,
+            )  # (B,)
 
         # === Accept/Reject ===
-        accept_mask = prop_impl.accept(
+        accept_mask, prop_E_from_accept = prop_impl.accept(
             model=model,
             dataset_info=dataset_info,
             current_nodes=node_types_list,
@@ -143,17 +135,21 @@ def mcmc_sample_batch(
             extra_features=extra_features,
             domain_features=domain_features,
             device=device,
-        )  # BoolTensor on CPU
+        )
 
+        # Update states and energies where accepted
         n_acc = int(accept_mask.sum().item())
         total_accepts += n_acc
-
         if n_acc > 0:
-            # Update states and energies where accepted
             for i, acc in enumerate(accept_mask):
                 if acc:
                     node_types_list[i] = prop_result.prop_nodes[i]
                     edge_types_list[i] = prop_result.prop_edges[i]
-            current_E[accept_mask.to(current_E.device)] = prop_E[accept_mask.to(prop_E.device)]
+
+            # Prefer fused prop_E returned by accept() when available
+            eff_prop_E = prop_E if prop_E is not None else prop_E_from_accept
+            assert eff_prop_E is not None, "Proposal did not provide proposed energies."
+            mask_dev = accept_mask.to(current_E.device)
+            current_E[mask_dev] = eff_prop_E[mask_dev]
 
     return node_types_list, edge_types_list, total_accepts, steps * B

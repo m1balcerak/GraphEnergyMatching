@@ -1,7 +1,15 @@
 # sampler_energy.py, do not delete this line
 from typing import List, Sequence, Tuple
+from contextlib import nullcontext
 import torch
 import torch.nn.functional as F
+
+
+def _no_autocast_ctx(device: torch.device):
+    # Ensure numerically sensitive feature engineering stays in FP32
+    if device.type == "cuda":
+        return torch.amp.autocast("cuda", enabled=False)
+    return nullcontext()
 
 
 def build_batched_inputs(
@@ -51,9 +59,10 @@ def build_batched_inputs(
         "t": t,
     }
 
-    # Extra/domain features (prevent gradients from flowing to proposals)
-    extra_feat = extra_features(noisy_data)
-    extra_mol_feat = domain_features(noisy_data)
+    # Extra/domain features in **FP32** regardless of surrounding autocast
+    with _no_autocast_ctx(device):
+        extra_feat = extra_features(noisy_data)
+        extra_mol_feat = domain_features(noisy_data)
 
     extra_X = torch.cat((extra_feat.X, extra_mol_feat.X), dim=-1)
     extra_E = torch.cat((extra_feat.E, extra_mol_feat.E), dim=-1)
@@ -88,8 +97,7 @@ def energy_batch(
     domain_features,
     detach: bool = True,
 ) -> torch.Tensor:
-    """Batched energy for a list of graphs. Returns (B,) tensor if detach=False,
-    otherwise a detached (B,) tensor suitable for MCMC acceptance decisions."""
+    """Batched energy for a list of graphs."""
     X_input, E_input, y_input, node_mask = build_batched_inputs(
         node_types_list, edge_types_list, dataset_info, device, extra_features, domain_features
     )
@@ -146,7 +154,7 @@ def energy_and_grads_batch(
     y = torch.zeros((B, y_dim), device=device)
     t = torch.zeros((B, 1), device=device)
 
-    # Extra features built from no-grad copies to keep clean gradients
+    # Extra features built from no-grad copies in **FP32**
     noisy_data_ng = {
         "X_t": X_pad.detach(),
         "E_t": E_pad.detach(),
@@ -154,8 +162,10 @@ def energy_and_grads_batch(
         "node_mask": node_mask,
         "t": t,
     }
-    extra_feat = extra_features(noisy_data_ng)
-    extra_mol_feat = domain_features(noisy_data_ng)
+    with _no_autocast_ctx(device):
+        extra_feat = extra_features(noisy_data_ng)
+        extra_mol_feat = domain_features(noisy_data_ng)
+
     extra_X = torch.cat((extra_feat.X, extra_mol_feat.X), dim=-1).detach()
     extra_E = torch.cat((extra_feat.E, extra_mol_feat.E), dim=-1).detach()
     extra_y = torch.cat((extra_feat.y, extra_mol_feat.y), dim=-1).detach()

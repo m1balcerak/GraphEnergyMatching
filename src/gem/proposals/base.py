@@ -30,6 +30,10 @@ class Proposal:
     ) -> ProposalResult:
         raise NotImplementedError
 
+    def needs_proposed_energy(self) -> bool:
+        """Whether mcmc driver should compute E' (prop_E) before accept()."""
+        return True
+
     def accept(
         self,
         *,
@@ -38,11 +42,11 @@ class Proposal:
         current_nodes: Sequence[torch.Tensor],
         current_edges: Sequence[torch.Tensor],
         prop_result: ProposalResult,
-        current_E: torch.Tensor,  # (B,)
-        prop_E: torch.Tensor,     # (B,)
+        current_E: torch.Tensor,                 # (B,)
+        prop_E: Optional[torch.Tensor],          # (B,) or None if proposal will compute it
         extra_features,
         domain_features,
         device: torch.device,
-    ) -> torch.Tensor:
-        """Return boolean accept mask on CPU (length B)."""
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """Return (accept_mask on CPU, prop_E on device or None)."""
         raise NotImplementedError
