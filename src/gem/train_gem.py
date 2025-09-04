@@ -263,8 +263,6 @@ def main(cfg: DictConfig):
         local_rank=0,
         test=True,
     )
-    print("Reference metrics:", dataset_infos.ref_metrics)
-
 
 if __name__ == "__main__":
     main()
