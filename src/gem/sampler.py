@@ -1,111 +1,32 @@
-# sampler.py
-import math
-import random
-from typing import List, Tuple, Union
-
+# sampler.py, do not delete this line
+from typing import List, Sequence, Tuple, Optional
 import torch
-import torch.nn.functional as F
+
 from flow_matching.noise_distribution import NoiseDistribution
 from flow_matching import flow_matching_utils
 
+# Re-export energy utilities for external use
+from .sampler_energy import (
+    build_batched_inputs,
+    energy_batch,
+    energy_and_grads_batch,
+)
 
-def _energy(
-    model,
-    node_types: torch.Tensor,
-    edge_types: torch.Tensor,
-    dataset_info,
-    device: torch.device,
-    extra_features,
-    domain_features,
-    detach: bool = True,
-) -> Union[torch.Tensor, float]:
-    """Compute scalar energy of a graph using the transformer model.
-
-    Parameters
-    ----------
-    detach: bool, default True
-        If ``True`` the returned energy is detached from the computation
-        graph and converted to a Python float. When ``False`` a tensor is
-        returned, which allows gradients to flow for training.
-    """
-    # Pad to the size of this graph (batch max) instead of the dataset-wide
-    # maximum number of nodes used during training.
-    n = node_types.shape[0]
-    num_node_types = dataset_info.output_dims["X"]
-    num_edge_types = dataset_info.output_dims["E"]
-
-    X = F.one_hot(node_types, num_classes=num_node_types).float()
-    E = F.one_hot(edge_types, num_classes=num_edge_types).float()
-
-    X_pad = X.unsqueeze(0).to(device)
-    E_pad = E.unsqueeze(0).to(device)
-
-    y = torch.zeros((1, dataset_info.output_dims["y"]), device=device)
-    node_mask = torch.ones((1, n), device=device)
-    t = torch.zeros((1, 1), device=device)
-
-    noisy_data = {
-        "X_t": X_pad,
-        "E_t": E_pad,
-        "y_t": y,
-        "node_mask": node_mask,
-        "t": t,
-    }
-
-    extra_feat = extra_features(noisy_data)
-    extra_mol_feat = domain_features(noisy_data)
-
-    extra_X = torch.cat((extra_feat.X, extra_mol_feat.X), dim=-1)
-    extra_E = torch.cat((extra_feat.E, extra_mol_feat.E), dim=-1)
-    extra_y = torch.cat((extra_feat.y, extra_mol_feat.y), dim=-1)
-    extra_y = torch.cat((extra_y, t), dim=1)
-
-    X_input = torch.cat((X_pad, extra_X), dim=2)
-    E_input = torch.cat((E_pad, extra_E), dim=3)
-    y_input = torch.cat((y, extra_y), dim=1)
-
-    if X_input.shape[-1] < dataset_info.input_dims["X"]:
-        pad = dataset_info.input_dims["X"] - X_input.shape[-1]
-        X_input = torch.cat(
-            (X_input, torch.zeros(1, n, pad, device=device)), dim=-1
-        )
-    if E_input.shape[-1] < dataset_info.input_dims["E"]:
-        pad = dataset_info.input_dims["E"] - E_input.shape[-1]
-        E_input = torch.cat(
-            (E_input, torch.zeros(1, n, n, pad, device=device)), dim=-1
-        )
-    if y_input.shape[-1] < dataset_info.input_dims["y"]:
-        pad = dataset_info.input_dims["y"] - y_input.shape[-1]
-        y_input = torch.cat((y_input, torch.zeros(1, pad, device=device)), dim=-1)
-
-    _, energy = model(X_input, E_input, y_input, node_mask, return_energy=True)
-    if detach:
-        return energy.detach().item()
-    return energy
+# Proposals
+from .proposals.base import Proposal
+from .proposals.random_proposal import RandomProposal
+from .proposals.gwd_proposal import GWDProposal
 
 
-def _local_proposal(
-    node_types: torch.Tensor,
-    edge_types: torch.Tensor,
-    num_node_types: int,
-    num_edge_types: int,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Propose a uniformly random single edit on nodes or edges."""
-    node_types = node_types.clone()
-    edge_types = edge_types.clone()
-    n = node_types.size(0)
-
-    if n == 0:
-        return node_types, edge_types
-
-    if n > 1 and random.random() >= 0.5:
-        i, j = random.sample(range(n), 2)
-        val = random.randrange(num_edge_types)
-        edge_types[i, j] = edge_types[j, i] = val
-    else:
-        idx = random.randrange(n)
-        node_types[idx] = random.randrange(num_node_types)
-    return node_types, edge_types
+def make_proposal(method: str, **kwargs) -> Proposal:
+    """Factory for proposal mechanisms."""
+    m = (method or "").lower()
+    if m == "random":
+        return RandomProposal()
+    if m == "gwd":
+        tau = float(kwargs.get("gwd_tau", 1.0))
+        return GWDProposal(tau=tau)
+    raise ValueError(f"Unknown proposal '{method}'. Supported: ['random', 'gwd'].")
 
 
 def initialize_random_graphs(
@@ -117,10 +38,8 @@ def initialize_random_graphs(
     """Sample a batch of random graphs used as MCMC initial states.
 
     The number of nodes is drawn from the empirical training-set distribution
-    and node/edge types are sampled from the reference (noise) distribution
-    used in DEFoG.
+    and node/edge types are sampled from the reference (noise) distribution.
     """
-
     # Sample number of nodes from empirical distribution
     n_nodes = dataset_info.nodes_dist.sample_n(batch_size, device)
     n_max = torch.max(n_nodes).item()
@@ -136,67 +55,105 @@ def initialize_random_graphs(
 
     graphs: List[Tuple[torch.Tensor, torch.Tensor]] = []
     for i in range(batch_size):
-        n = n_nodes[i].item()
+        n = int(n_nodes[i].item())
         node_types = torch.argmax(z_T.X[i, :n], dim=-1)
         edge_types = torch.argmax(z_T.E[i, :n, :n], dim=-1)
         graphs.append((node_types.cpu(), edge_types.cpu()))
-
     return graphs
 
 
-def mcmc_sample(
+def mcmc_sample_batch(
     model,
     dataset_info,
-    node_types: torch.Tensor,
-    edge_types: torch.Tensor,
+    node_types_list: Sequence[torch.Tensor],
+    edge_types_list: Sequence[torch.Tensor],
     extra_features,
     domain_features,
     steps: int = 10,
     device: torch.device = torch.device("cpu"),
+    proposal: str = "random",
+    gwd_tau: float = 1.0,
 ):
-    """Run a simple MCMC chain starting from the provided graph.
+    """Run parallel MCMC chains (one per graph) starting from the provided batch.
+
+    Parameters
+    ----------
+    proposal : {'random', 'gwd'}
+        - 'random': uniformly random single-edit proposal (symmetric).
+        - 'gwd'   : gradient-weighted single-edit proposal with exact MH.
 
     Returns
     -------
     tuple
-        ``(node_types, edge_types, n_accept, n_steps)`` where ``n_accept``
-        is the number of accepted proposals during the chain and
-        ``n_steps`` is the total number of MCMC iterations. These values
-        can be used to compute acceptance rates.
+        (node_types_list, edge_types_list, n_accept_total, n_steps_total)
     """
-    node_types = node_types.to(device)
-    edge_types = edge_types.to(device)
-    num_node_types = dataset_info.output_dims["X"]
-    num_edge_types = dataset_info.output_dims["E"]
+    assert len(node_types_list) == len(edge_types_list)
+    B = len(node_types_list)
+    if B == 0:
+        return [], [], 0, 0
 
-    current_energy = _energy(
-        model,
-        node_types,
-        edge_types,
-        dataset_info,
-        device,
-        extra_features,
-        domain_features,
+    # Current energies for all graphs (detached for acceptance decisions)
+    current_E = energy_batch(
+        model=model,
+        node_types_list=node_types_list,
+        edge_types_list=edge_types_list,
+        dataset_info=dataset_info,
+        device=device,
+        extra_features=extra_features,
+        domain_features=domain_features,
         detach=True,
-    )
-    n_accept = 0
-    for _ in range(steps):
-        prop_node, prop_edge = _local_proposal(
-            node_types, edge_types, num_node_types, num_edge_types
-        )
-        prop_energy = _energy(
-            model,
-            prop_node,
-            prop_edge,
-            dataset_info,
-            device,
-            extra_features,
-            domain_features,
-            detach=True,
-        )
-        if math.log(random.random()) < current_energy - prop_energy:
-            node_types, edge_types = prop_node, prop_edge
-            current_energy = prop_energy
-            n_accept += 1
+    )  # (B,)
 
-    return node_types.cpu(), edge_types.cpu(), n_accept, steps
+    prop_impl: Proposal = make_proposal(proposal, gwd_tau=gwd_tau)
+
+    total_accepts = 0
+    for _ in range(steps):
+        # === Propose ===
+        prop_result = prop_impl.propose(
+            model=model,
+            dataset_info=dataset_info,
+            node_types_list=node_types_list,
+            edge_types_list=edge_types_list,
+            extra_features=extra_features,
+            domain_features=domain_features,
+            device=device,
+        )
+
+        # === Score proposals ===
+        prop_E = energy_batch(
+            model=model,
+            node_types_list=prop_result.prop_nodes,
+            edge_types_list=prop_result.prop_edges,
+            dataset_info=dataset_info,
+            device=device,
+            extra_features=extra_features,
+            domain_features=domain_features,
+            detach=True,
+        )  # (B,)
+
+        # === Accept/Reject ===
+        accept_mask = prop_impl.accept(
+            model=model,
+            dataset_info=dataset_info,
+            current_nodes=node_types_list,
+            current_edges=edge_types_list,
+            prop_result=prop_result,
+            current_E=current_E,
+            prop_E=prop_E,
+            extra_features=extra_features,
+            domain_features=domain_features,
+            device=device,
+        )  # BoolTensor on CPU
+
+        n_acc = int(accept_mask.sum().item())
+        total_accepts += n_acc
+
+        if n_acc > 0:
+            # Update states and energies where accepted
+            for i, acc in enumerate(accept_mask):
+                if acc:
+                    node_types_list[i] = prop_result.prop_nodes[i]
+                    edge_types_list[i] = prop_result.prop_edges[i]
+            current_E[accept_mask.to(current_E.device)] = prop_E[accept_mask.to(prop_E.device)]
+
+    return node_types_list, edge_types_list, total_accepts, steps * B

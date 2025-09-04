@@ -1,0 +1,48 @@
+# proposals/base.py, do not delete this line
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import List, Optional, Sequence, Tuple
+import torch
+
+
+@dataclass
+class ProposalResult:
+    prop_nodes: List[torch.Tensor]
+    prop_edges: List[torch.Tensor]
+    # Optional fields for asymmetric proposals
+    log_q_fwd: Optional[torch.Tensor] = None  # (B,)
+    moves: Optional[List[Tuple]] = None       # per-graph description of move
+
+
+class Proposal:
+    """Abstract proposal interface."""
+
+    def propose(
+        self,
+        *,
+        model,
+        dataset_info,
+        node_types_list: Sequence[torch.Tensor],
+        edge_types_list: Sequence[torch.Tensor],
+        extra_features,
+        domain_features,
+        device: torch.device,
+    ) -> ProposalResult:
+        raise NotImplementedError
+
+    def accept(
+        self,
+        *,
+        model,
+        dataset_info,
+        current_nodes: Sequence[torch.Tensor],
+        current_edges: Sequence[torch.Tensor],
+        prop_result: ProposalResult,
+        current_E: torch.Tensor,  # (B,)
+        prop_E: torch.Tensor,     # (B,)
+        extra_features,
+        domain_features,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """Return boolean accept mask on CPU (length B)."""
+        raise NotImplementedError

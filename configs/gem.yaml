@@ -1,11 +1,11 @@
-# gem.yaml
+# gem.yaml, do not delete this line
 defaults:
-  - _self_
   - general: general_default
   - model: discrete
   - train: train_default
   - dataset: qm9
   - sample: sample_default
+  - _self_
 
 # Dedicated settings for GEM training and sampling
 general:
@@ -13,9 +13,36 @@ general:
   gpus: 0
 
 train:
-  cd_steps: 10
-  n_epochs: 1
-  batch_size: 32
+  # Contrastive Divergence (CD-k)
+  cd_steps: 15
+
+  # >>> Iteration-based training <<<
+  # n_epochs is ignored by train_gem.py; we keep it for compatibility.
+  n_epochs: 0
+  max_iters: 20
+
+  batch_size: 64
+
+  # Logging / reproducibility
+  log_interval: 1
+  seed: 0
+
+  # Modern speed-ups (optional, safe-guarded in code)
+  torch_compile: False          # set true if using PyTorch >= 2.1
+  compile_mode: max-autotune    # or reduce-overhead
+  amp_dtype: null               # one of: null | fp16 | bf16
+
+  # --- Sampler config (used during training/CD) ---
+  # Choose 'random' (single edit) or 'gwd' (gradient-weighted, single edit).
+  proposal: gwd
+  # Temperature for GWD logits (lower -> greedier).
+  gwd_tau: 1.0
 
 sample:
-  sample_steps: 10
+  sample_steps: 15
+  eval_batch_size: 64
+
+  # --- Sampler config (used during evaluation sampling) ---
+  proposal: gwd
+  # Temperature for GWD logits (lower -> greedier).
+  gwd_tau: 1.0
