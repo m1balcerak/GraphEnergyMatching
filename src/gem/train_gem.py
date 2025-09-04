@@ -3,6 +3,7 @@ import os
 import sys
 import time
 from contextlib import nullcontext
+from typing import List
 
 import torch
 import torch.nn as nn
@@ -151,13 +152,32 @@ def main(cfg: DictConfig):
         # -------------------- Negative phase: batched CD-k --------------------
         _sync_if_cuda(device)
         t_mcmc0 = time.perf_counter()
+        # Prepare initial states mixing data and random graphs according to gamma_train.
+        init_nodes = [t.clone() for t in node_list]
+        init_edges = [t.clone() for t in edge_list]
+        gamma_train = float(getattr(cfg.train, "gamma_train", 0.0))
+        n_rand = int(round(B * gamma_train))
+        if n_rand > 0:
+            rand_graphs = sampler.initialize_random_graphs(
+                batch_size=n_rand,
+                dataset_info=dataset_infos,
+                device=device,
+                transition=cfg.model.transition,
+            )
+            rand_nodes = [nt for (nt, _) in rand_graphs]
+            rand_edges = [et for (_, et) in rand_graphs]
+            replace_idx = torch.randperm(B)[:n_rand]
+            for i, idx in enumerate(replace_idx):
+                init_nodes[idx] = rand_nodes[i]
+                init_edges[idx] = rand_edges[i]
+
         # NOTE: the sampler internally enables grad when needed (GWD).
         with torch.no_grad():
             neg_nodes, neg_edges, n_accepts, n_steps_total = sampler.mcmc_sample_batch(
                 model=model,
                 dataset_info=dataset_infos,
-                node_types_list=[t.clone() for t in node_list],
-                edge_types_list=[t.clone() for t in edge_list],
+                node_types_list=init_nodes,
+                edge_types_list=init_edges,
                 extra_features=extra_features,
                 domain_features=domain_features,
                 steps=cfg.train.cd_steps,
@@ -224,15 +244,37 @@ def main(cfg: DictConfig):
     model.eval()
 
     eval_bs = int(getattr(cfg.sample, "eval_batch_size", cfg.train.batch_size))
-    init_graphs = sampler.initialize_random_graphs(
-        batch_size=eval_bs,
-        dataset_info=dataset_infos,
-        device=device,
-        transition=cfg.model.transition,
-    )
 
-    init_nodes = [nt for (nt, _) in init_graphs]
-    init_edges = [et for (_, et) in init_graphs]
+    # Start from data graphs and replace a fraction with random graphs according to gamma_evaluate.
+    init_nodes: List[torch.Tensor] = []
+    init_edges: List[torch.Tensor] = []
+    while len(init_nodes) < eval_bs:
+        batch = _next_batch()
+        dense_data, node_mask = utils.to_dense(
+            batch.x, batch.edge_index, batch.edge_attr, batch.batch
+        )
+        graphs = dense_data.mask(node_mask, collapse=True).split(node_mask)
+        for g in graphs:
+            init_nodes.append(g.X.long().cpu())
+            init_edges.append(g.E.long().cpu())
+            if len(init_nodes) >= eval_bs:
+                break
+
+    gamma_eval = float(getattr(cfg.sample, "gamma_evaluate", 1.0))
+    n_rand = int(round(eval_bs * gamma_eval))
+    if n_rand > 0:
+        rand_graphs = sampler.initialize_random_graphs(
+            batch_size=n_rand,
+            dataset_info=dataset_infos,
+            device=device,
+            transition=cfg.model.transition,
+        )
+        rand_nodes = [nt for (nt, _) in rand_graphs]
+        rand_edges = [et for (_, et) in rand_graphs]
+        replace_idx = torch.randperm(eval_bs)[:n_rand]
+        for i, idx in enumerate(replace_idx):
+            init_nodes[idx] = rand_nodes[i]
+            init_edges[idx] = rand_edges[i]
 
     # NOTE: the sampler internally enables grad when needed (GWD)
     with torch.no_grad():

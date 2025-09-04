@@ -23,6 +23,10 @@ train:
 
   batch_size: 256
 
+  # Fraction of MCMC chains initialized from the noise distribution.
+  # 1.0 => all chains start from random graphs; 0.0 => all start from data.
+  gamma_train: 0.0
+
   # Logging / reproducibility
   log_interval: 1
   seed: 0
@@ -41,6 +45,10 @@ train:
 sample:
   sample_steps: 10
   eval_batch_size: 256
+
+  # Fraction of evaluation chains initialized from the noise distribution.
+  # 1.0 => all chains start from random graphs; 0.0 => all start from data.
+  gamma_evaluate: 1.0
 
   # --- Sampler config (used during evaluation sampling) ---
   proposal: gwd
