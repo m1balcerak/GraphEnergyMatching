@@ -1,11 +1,11 @@
 # gem.yaml
 defaults:
-  - _self_
   - general: general_default
   - model: discrete
   - train: train_default
   - dataset: qm9
   - sample: sample_default
+  - _self_
 
 # Dedicated settings for GEM training and sampling
 general:
