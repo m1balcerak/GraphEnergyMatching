@@ -14,12 +14,12 @@ general:
 
 train:
   # Contrastive Divergence (CD-k)
-  cd_steps: 30
+  cd_steps: 10
 
   # >>> Iteration-based training <<<
   # n_epochs is ignored by train_gem.py; we keep it for compatibility.
   n_epochs: 0
-  max_iters: 0
+  max_iters: 10
 
   batch_size: 256
 
@@ -34,15 +34,15 @@ train:
 
   # --- Sampler config (used during training/CD) ---
   # Choose 'random' (single edit) or 'gwd' (gradient-weighted, single edit).
-  proposal: random
+  proposal: gwd
   # Temperature for GWD logits (lower -> greedier).
   gwd_tau: 1.0
 
 sample:
-  sample_steps: 0
+  sample_steps: 10
   eval_batch_size: 256
 
   # --- Sampler config (used during evaluation sampling) ---
-  proposal: random
+  proposal: gwd
   # Temperature for GWD logits (lower -> greedier).
   gwd_tau: 1.0
