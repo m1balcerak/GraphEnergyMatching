@@ -1,0 +1,4 @@
+name: graph-energy-matching
+gpus: 1
+resume: null
+validity_mode: vfm_relaxed

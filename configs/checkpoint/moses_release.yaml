@@ -1,0 +1,24 @@
+# MOSES release checkpoint artifacts.
+pretrained:
+  name: gem_moses_pretrained_it400000.pt
+  iteration: 400000
+  sha256: bc25ecc18af06396e9d19211cf5300ab98e80ba295be9b93b1ff99651ef9b874
+  source_training_checkpoint_sha256: 8394fd0e9f0cb63122a5c848ed42f7542d5fbd5265001c5cc6f2b40e6418ae84
+  training_dataset_filter: true
+
+name: gem_moses_it000500.pt
+iteration: 500
+sha256: 6360e1fb2c1bfd0e9a6ff8c5d5b83c8baf07211f81c1727581c01e7da0be50a0
+use_ema: false
+source_training_checkpoint_sha256: e017709dbb42817a9928aa902c78aa75c259df9cb4c3192be97d44b9be531681
+training_dataset_filter: true
+release_training_default_filter: true
+evaluation:
+  generated_samples: 25000
+  mcmc_steps: 1000
+  vun: 0.94032
+  fcd: 1.466017749760752
+  fcd_reference: test_scaffolds
+  fcd_reference_filter: false
+  fcd_reference_size: 176225
+  fcd_generated_largest_fragment: true

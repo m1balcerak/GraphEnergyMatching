@@ -1,0 +1,18 @@
+# Canonical MOSES inference sampler.
+steps: 1000
+proposal: dlangevin_two_betas_annealing_vec_no_origin
+simple_n_edits: 1
+gwd_beta: 1.0
+dl_beta: 2.360255480670657
+dl_beta_prop: 2.360255480670657
+dl_beta_mh_init: 0.7765126196192521
+dl_beta_mh_final: 17.619552679597852
+dl_beta_mh_anneal_steps: 500
+dl_lambda_X: 4.002714439035672
+dl_lambda_E: 4.834996084900104
+chain_warmup:
+  enabled: true
+  steps: 225
+  proposal: simple_ver2
+  simple_n_edits: 1
+  vectorized: true

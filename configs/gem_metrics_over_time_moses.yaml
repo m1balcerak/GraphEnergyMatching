@@ -1,0 +1,97 @@
+defaults:
+  - general: general_default
+  - model: discrete
+  - train: train_default
+  - dataset: moses
+  - sample: sample_default
+  - release_sampler: moses
+  - checkpoint: moses_release
+  - _self_
+
+general:
+  name: gem_metrics_over_time_moses
+  gpus: 1
+  log_stats: true
+
+model:
+  activation: silu
+  n_layers: 12
+  hidden_mlp_dims:
+    X: 256
+    E: 128
+    y: 256
+  hidden_dims:
+    dx: 256
+    de: 64
+    dy: 128
+    n_head: 8
+    dim_ffX: 256
+    dim_ffE: 128
+    dim_ffy: 256
+
+dataset:
+  filter: false
+
+metrics_run:
+  enabled: true
+  checkpoint: null
+  use_ema: false
+  seed: 0
+
+  total_samples: 25000
+  batch_size: 512
+  init_source: noise
+  noise_transition: uniform
+  steps:
+    - ${release_sampler.steps}
+
+  proposal: ${release_sampler.proposal}
+  simple_n_edits: ${release_sampler.simple_n_edits}
+  gwd_beta: ${release_sampler.gwd_beta}
+  energy_threshold: null
+  dl_beta: ${release_sampler.dl_beta}
+  dl_beta_prop: ${release_sampler.dl_beta_prop}
+  dl_beta_mh_init: ${release_sampler.dl_beta_mh_init}
+  dl_beta_mh_final: ${release_sampler.dl_beta_mh_final}
+  dl_beta_mh_anneal_steps: ${release_sampler.dl_beta_mh_anneal_steps}
+  dl_lambda_X: ${release_sampler.dl_lambda_X}
+  dl_lambda_E: ${release_sampler.dl_lambda_E}
+  dl_beta_near: ${metrics_run.dl_beta}
+  dl_lambda_X_near: ${metrics_run.dl_lambda_X}
+  dl_lambda_E_near: ${metrics_run.dl_lambda_E}
+  dl_beta_far: ${metrics_run.dl_beta}
+  dl_lambda_X_far: ${metrics_run.dl_lambda_X}
+  dl_lambda_E_far: ${metrics_run.dl_lambda_E}
+
+  chain_warmup:
+    enabled: ${release_sampler.chain_warmup.enabled}
+    steps: ${release_sampler.chain_warmup.steps}
+    proposal: ${release_sampler.chain_warmup.proposal}
+    simple_n_edits: ${release_sampler.chain_warmup.simple_n_edits}
+    vectorized: ${release_sampler.chain_warmup.vectorized}
+
+  amp_dtype: null
+  collect_sampler_stats: false
+
+  compute_fcd: true
+  # Internal "val" is the official MOSES test_scaffolds.csv split.
+  fcd_reference_split: val
+  fcd_reference_filter: false
+  fcd_reference_size: 0
+  fcd_reference_seed: null
+  fcd_reference_expected_size: 176225
+  fcd_reference_canonicalize: false
+  fcd_generated_largest_fragment: true
+  fcd_device: auto
+  fcd_reference_stats_cache: ${dataset.datadir}/fcd_stats/test_scaffolds_raw_full.npz
+
+  output_json: metrics_over_time.json
+  output_csv: metrics_over_time.csv
+  save_smiles: true
+  smiles_dir: generated_smiles
+
+hydra:
+  job:
+    chdir: true
+  run:
+    dir: outputs/metrics/${general.name}/${now:%Y-%m-%d_%H-%M-%S}

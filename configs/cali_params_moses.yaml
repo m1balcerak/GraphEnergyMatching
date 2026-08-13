@@ -1,0 +1,116 @@
+defaults:
+  - general: general_default
+  - model: discrete
+  - train: train_default
+  - dataset: moses
+  - _self_
+
+general:
+  name: cali_params_moses
+  gpus: 1
+  log_stats: false
+
+model:
+  activation: silu
+  n_layers: 12
+  hidden_mlp_dims:
+    X: 256
+    E: 128
+    y: 256
+  hidden_dims:
+    dx: 256
+    de: 64
+    dy: 128
+    n_head: 8
+    dim_ffX: 256
+    dim_ffE: 128
+    dim_ffy: 256
+
+dataset:
+  filter: false
+
+train:
+  seed: 0
+  resume: null
+  init_ckpt: null
+
+cali:
+  use_ema: false
+  N_noise: 32
+  N_data: 0
+  steps: 200
+  proposal: dlangevin_two_betas_annealing_vec_no_origin
+  dl_beta_mh: null
+  dl_beta_mh_final: null
+  dl_beta_mh_anneal_steps: 500
+  noise_transition: uniform
+
+  objective:
+    mean_energy_weight: 1.0
+    distance_weight: 0.0
+    validity_weight: 0.0
+    connected_weight: 0.0
+    real_accept_weight: 0.0
+    novelty_weight: 0.0
+
+  chain_warmup:
+    enabled: true
+    steps: 225
+    proposal: simple_ver2
+    simple_n_edits: 1
+    vectorized: true
+
+  search:
+    method: optuna
+    n_trials: 100
+    log_scale: true
+    single_params: true
+    n_jobs: 1
+    optuna_storage: null
+    optuna_study_name: null
+    optuna_load_if_exists: true
+    beta_min: 5.0
+    beta_max: 13.0
+    beta_prop_min: 1.0
+    beta_prop_max: 15.0
+    beta_mh_init_min: 0.5
+    beta_mh_init_max: 5.0
+    beta_mh_final_min: 5.0
+    beta_mh_final_max: 20.0
+    lambda_X_min: 0.01
+    lambda_X_max: 5.0
+    lambda_E_min: 0.01
+    lambda_E_max: 5.0
+
+  output:
+    csv: cali_results.csv
+    best_txt: best_params.txt
+    viz_png: cali_energy_trajectories.png
+    viz_csv: cali_energy_trajectories.csv
+
+viz:
+  enabled: true
+  proposal: ${cali.proposal}
+  energy_threshold: null
+  dl_beta: null
+  dl_lambda_X: null
+  dl_lambda_E: null
+  checkpoint: ${train.resume}
+  use_ema: ${cali.use_ema}
+  visualization_steps: ${cali.steps}
+  N_noise: 32
+  N_data: 0
+  M_data: 512
+  M_noise: 512
+  noise_transition: ${cali.noise_transition}
+  save_png: true
+  save_csv: true
+  filename_png: ${cali.output.viz_png}
+  filename_csv: ${cali.output.viz_csv}
+  plot_molecule_metrics: false
+
+hydra:
+  job:
+    chdir: true
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${dataset.name}-${general.name}

@@ -1,0 +1,5 @@
+name: 'moses'
+datadir: 'data/moses/moses_pyg/'
+remove_h: null
+filter: false
+compute_fcd: False

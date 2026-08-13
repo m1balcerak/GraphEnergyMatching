@@ -1,0 +1,162 @@
+# MOSES unconditional animation.
+defaults:
+  - general: general_default
+  - model: discrete
+  - train: train_default
+  - dataset: moses
+  - sample: sample_default
+  - release_sampler: moses
+  - _self_
+
+general:
+  name: gem_ebm_animation_moses_public
+  gpus: 1
+  log_stats: true
+
+model:
+  activation: silu
+  n_layers: 12
+  hidden_mlp_dims:
+    X: 256
+    E: 128
+    y: 256
+  hidden_dims:
+    dx: 256
+    de: 64
+    dy: 128
+    n_head: 8
+    dim_ffX: 256
+    dim_ffE: 128
+    dim_ffy: 256
+
+dataset:
+  filter: false
+
+viz:
+  enabled: true
+  M_data: 1024
+  M_noise: 1024
+  noise_transition: uniform
+  N_noise: 12
+  N_data: 0
+  visualization_steps: ${release_sampler.steps}
+  proposal: ${release_sampler.proposal}
+  simple_n_edits: ${release_sampler.simple_n_edits}
+  gwd_beta: ${release_sampler.gwd_beta}
+  dl_beta: ${release_sampler.dl_beta}
+  dl_beta_prop: ${release_sampler.dl_beta_prop}
+  dl_beta_mh_init: ${release_sampler.dl_beta_mh_init}
+  dl_beta_mh_final: ${release_sampler.dl_beta_mh_final}
+  dl_beta_mh_anneal_steps: ${release_sampler.dl_beta_mh_anneal_steps}
+  dl_lambda_X: ${release_sampler.dl_lambda_X}
+  dl_lambda_E: ${release_sampler.dl_lambda_E}
+  chain_warmup:
+    enabled: ${release_sampler.chain_warmup.enabled}
+    steps: ${release_sampler.chain_warmup.steps}
+    proposal: ${release_sampler.chain_warmup.proposal}
+    simple_n_edits: ${release_sampler.chain_warmup.simple_n_edits}
+    vectorized: ${release_sampler.chain_warmup.vectorized}
+  amp_dtype: null
+  plot_molecule_metrics: true
+  metrics_only: false
+  checkpoint: null
+  use_ema: false
+  legend_fontsize: 12
+  mean_line_width: 2.4
+  band_line_width: 0.9
+
+animation:
+  enabled: true
+  seed: null
+  steps: ${viz.visualization_steps}
+  interval_ms: 50
+  fps: null
+  record_every: 10
+  N_noise: ${viz.N_noise}
+  N_data: ${viz.N_data}
+  noise_transition: ${viz.noise_transition}
+  proposal: ${viz.proposal}
+  gwd_beta: ${viz.gwd_beta}
+  dl_beta: ${viz.dl_beta}
+  dl_beta_prop: ${viz.dl_beta_prop}
+  dl_beta_mh_init: ${viz.dl_beta_mh_init}
+  dl_beta_mh_final: ${viz.dl_beta_mh_final}
+  dl_beta_mh_anneal_steps: ${viz.dl_beta_mh_anneal_steps}
+  dl_lambda_X: ${viz.dl_lambda_X}
+  dl_lambda_E: ${viz.dl_lambda_E}
+  amp_dtype: ${viz.amp_dtype}
+  chain_warmup: ${viz.chain_warmup}
+  checkpoint: ${viz.checkpoint}
+  use_ema: ${viz.use_ema}
+
+  selection_policy: all
+  random_display_count: 12
+
+  plot_warmup: true
+  plot_metrics: true
+  plot_novelty: false
+  show_metric_panel: true
+  include_band: true
+  show_band_spans: false
+  show_noise_distribution_average: false
+  include_mean: true
+  plot_individual_traces: true
+
+  display_molecules: true
+  molecule_legends: null
+  molecule_title: Samples initialized from noise
+  molecule_square_panel: false
+  max_display: 12
+  mols_per_row: 3
+  subimg_size: [520, 520]
+  molecule_draw_padding: 0.08
+  molecule_bond_line_width: 2.4
+  molecule_min_font_size: 10
+  molecule_max_font_size: 44
+  molecule_draw_same_scale: false
+
+  figure_width: 15.5
+  figure_height_single: 7.6
+  figure_height_multi: 6.2
+  panel_width_ratios: [1.4, 1.0]
+  panel_wspace: 0.08
+  use_tight_layout: true
+  metrics_panel_hspace: 0.22
+  metric_panel_height_ratio: 0.35
+
+  plot_title_fontsize: 16
+  molecule_title_fontsize: 17
+  axis_label_fontsize: 13
+  show_y_axis_labels: true
+  tick_fontsize: 11
+  legend_fontsize: ${viz.legend_fontsize}
+  step_text_fontsize: 12
+  empty_panel_fontsize: 11
+  energy_ylabel_labelpad: null
+
+  metric_line_width: 2.4
+  mean_line_width: ${viz.mean_line_width}
+  band_line_width: ${viz.band_line_width}
+  line_width: 1.2
+  chain_alpha: 0.3
+  chain_color: "#D55E00"
+  mean_color: "#0072B2"
+  train_expectation_color: "#333333"
+  validity_color: "#CC79A7"
+  novelty_color: "#009E73"
+  warmup_color: "#E5E5E5"
+
+  save_animation: true
+  animation_format: gif
+  dpi: 150
+  save_png: true
+  save_final_quality: true
+  filename_animation: moses_unconditional_animation.gif
+  filename_png: moses_unconditional_animation.png
+  filename_final_quality: moses_unconditional_final_quality.json
+
+hydra:
+  job:
+    chdir: true
+  run:
+    dir: outputs/animations/${general.name}/${now:%Y-%m-%d_%H-%M-%S}

@@ -1,0 +1,126 @@
+defaults:
+  - general: general_default
+  - model: discrete
+  - train: train_default
+  - dataset: moses
+  - sample: sample_default
+  - _self_
+
+general:
+  name: gem_moses
+  gpus: 1
+  log_stats: false
+
+model:
+  activation: silu
+  n_layers: 12
+  hidden_mlp_dims:
+    X: 256
+    E: 128
+    y: 256
+  hidden_dims:
+    dx: 256
+    de: 64
+    dy: 128
+    n_head: 8
+    dim_ffX: 256
+    dim_ffE: 128
+    dim_ffy: 256
+
+dataset:
+  filter: true
+
+train:
+  max_iters: 600
+  batch_size: 128
+  lr: 1.0e-5
+
+  cl_steps: 1000
+  gamma_train: 0.5
+  proposal: dlangevin_two_betas_annealing_vec_no_origin
+  simple_n_edits: 1
+  gwd_beta: 1.0
+  dl_beta: 2.360255480670657
+  dl_beta_prop: 2.360255480670657
+  dl_beta_mh_init: 0.7765126196192521
+  dl_beta_mh_final: 17.619552679597852
+  dl_beta_mh_anneal_steps: 500
+  dl_lambda_X: 4.002714439035672
+  dl_lambda_E: 4.834996084900104
+  warmup_energy_threshold: false
+  chain_warmup:
+    enabled: true
+    steps: 225
+    proposal: simple_ver2
+    simple_n_edits: 1
+    vectorized: true
+
+  log_interval: 1
+  seed: 0
+
+  torch_compile: false
+  compile_mode: default
+  amp_dtype: null
+  distributed:
+    enabled: false
+    backend: nccl
+    find_unused_parameters: false
+    sampler_shuffle: true
+
+  lambda_cl: 0.1
+  lambda_fm: 1.0
+  cl_warmup_iters: 100
+  cl_loss_threshold: false
+  cl_clip_mode: paired_connected
+  cl_bad_negative_weight: 10.0
+  nan_guard:
+    enabled: true
+    lr_backoff: 0.5
+    min_lr: 1.0e-6
+    reset_optimizer_state: true
+
+  clip_grad: 10.0
+
+  save_every: 25
+  save_last: true
+  resume: null
+  init_ckpt: null
+  override_optimizer_lr_on_resume: false
+  plot_history:
+    enabled: true
+    every: 100
+    on_checkpoint: true
+
+fm:
+  enabled: true
+  batch_size: 128
+  k: 1.0
+  node_weight: 1.0
+  edge_weight: 1.0
+  loss: huber
+  grad_value_clip: 10.0
+  robust_delta: 1.0
+  detect_anomaly: false
+  warmup:
+    enabled: true
+    iters: 25
+    start_factor: 0.1
+
+noise:
+  transition: uniform
+
+ot:
+  cost: hist
+  alpha: 1.0
+  beta: 1.0
+  gamma: 1.0
+
+viz:
+  enabled: false
+  run_during_training: false
+
+hydra:
+  job:
+    chdir: True
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${dataset.name}-${general.name}
