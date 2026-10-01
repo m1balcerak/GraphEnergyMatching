@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper in preferred-citation."
+title: "Graph Energy Matching (GEM)"
+authors:
+  - family-names: Balcerak
+    given-names: Michal
+  - family-names: Shit
+    given-names: Suprosanna
+  - family-names: Prabhakar
+    given-names: Chinmay
+  - family-names: Kaltenbach
+    given-names: Sebastian
+  - family-names: Albergo
+    given-names: Michael S.
+  - family-names: Du
+    given-names: Yilun
+  - family-names: Menze
+    given-names: Bjoern
+repository-code: https://github.com/m1balcerak/GraphEnergyMatching
+url: https://michalbalcerak.ai/graph-energy-matching/
+license: MIT
+preferred-citation:
+  type: article
+  title: "Graph Energy Matching: Transport-Aligned Energy-Based Modeling for Graph Generation"
+  authors:
+    - family-names: Balcerak
+      given-names: Michal
+    - family-names: Shit
+      given-names: Suprosanna
+    - family-names: Prabhakar
+      given-names: Chinmay
+    - family-names: Kaltenbach
+      given-names: Sebastian
+    - family-names: Albergo
+      given-names: Michael S.
+    - family-names: Du
+      given-names: Yilun
+    - family-names: Menze
+      given-names: Bjoern
+  journal: "arXiv preprint arXiv:2603.23398"
+  year: 2026
+  url: https://arxiv.org/abs/2603.23398
