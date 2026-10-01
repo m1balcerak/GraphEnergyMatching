@@ -1,11 +1,11 @@
-# Graph Energy Matching (GEM)
+# Graph Energy Matching (GEM) [NeurIPS 2026]
 
 <p align="center">
   <img src="assets/gem_moses_animation.gif" alt="Graph Energy Matching unconditional MOSES sampling animation" width="900">
 </p>
 
 Official repository for
-[Graph Energy Matching: Transport-Aligned Energy-Based Modeling for Graph Generation](https://michalbalcerak.ai/graph-energy-matching/).
+[Graph Energy Matching: Transport-Aligned Energy-Based Modeling for Graph Generation](https://michalbalcerak.ai/graph-energy-matching/). [NeurIPS 2026]
 
 This v0.8 code release focuses on unconditional molecular graph sampling from
 the [MOSES](https://doi.org/10.3389/fphar.2020.565644) dataset.
