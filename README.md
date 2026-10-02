@@ -53,7 +53,7 @@ python sample_MOSES.py \
 
 Generated SMILES and validity flags are saved to `samples.csv`, with one row per generation attempt.
 
-## Train Transport Loss
+## Train Transport Regime
 
 The training pipeline consists of three stages: **a)** pretraining on corrupted graphs; **b)** calibrating the sampler to reach low-energy regions; **c)** contrastive fine-tuning to build energy barriers around the data manifold.
 
