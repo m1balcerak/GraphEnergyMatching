@@ -23,8 +23,8 @@ conda activate gem_code
 
 ## Data (MOSES)
 
-MOSES CSVs are downloaded automatically on first use and cached under
-`data/moses/moses_pyg/`.
+Training and evaluation download MOSES CSVs automatically on first use and cache
+them under `data/moses/moses_pyg/`. Checkpoint sampling does not require the dataset.
 
 ## Checkpoints
 
@@ -32,6 +32,27 @@ MOSES CSVs are downloaded automatically on first use and cached under
 - [MOSES fine-tuned checkpoint](https://huggingface.co/m1balcerak/GraphEnergyMatching/resolve/main/gem_moses_it000500.pt)
 
 We release pretrained and fine-tuned MOSES checkpoints.
+
+## Sample from a MOSES checkpoint
+
+Download the fine-tuned checkpoint and generate molecules:
+
+```bash
+mkdir -p checkpoints
+curl -fL https://huggingface.co/m1balcerak/GraphEnergyMatching/resolve/main/gem_moses_it000500.pt \
+  -o checkpoints/gem_moses_it000500.pt
+
+python sample_MOSES.py \
+  --checkpoint checkpoints/gem_moses_it000500.pt \
+  --num-samples 100 \
+  --mixing-steps 1000 \
+  --batch-size 64 \
+  --seed 0 \
+  --output samples.csv
+```
+
+Sampling uses 225 fixed transport steps followed by `--mixing-steps` MCMC steps.
+The CSV contains SMILES and validity flags, with one row per generation attempt.
 
 ## Train Transport Loss
 

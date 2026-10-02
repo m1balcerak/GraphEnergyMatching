@@ -316,7 +316,10 @@ class MosesDataModule(MolecularDataModule):
 
 
 class MOSESinfos(AbstractDatasetInfos):
-    def __init__(self, datamodule, cfg, recompute_statistics=False, meta=None):
+    def __init__(
+        self, datamodule, cfg, recompute_statistics=False, meta=None,
+        *, load_cached_statistics=True,
+    ):
         self.name = "MOSES"
         self.input_dims = None
         self.output_dims = None
@@ -390,7 +393,7 @@ class MOSESinfos(AbstractDatasetInfos):
             )
         assert set(meta.keys()) == set(meta_files.keys())
         for k, v in meta_files.items():
-            if (k not in meta or meta[k] is None) and os.path.exists(v):
+            if load_cached_statistics and (k not in meta or meta[k] is None) and os.path.exists(v):
                 meta[k] = np.loadtxt(v)
                 setattr(self, k, meta[k])
         if recompute_statistics or self.n_nodes is None:
