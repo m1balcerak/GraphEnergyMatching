@@ -31,7 +31,7 @@ MOSES CSVs are downloaded automatically on first use and cached under
 - [MOSES pretrained checkpoint](https://huggingface.co/m1balcerak/GraphEnergyMatching/resolve/main/gem_moses_pretrained_it400000.pt)
 - [MOSES fine-tuned checkpoint](https://huggingface.co/m1balcerak/GraphEnergyMatching/resolve/main/gem_moses_it000500.pt)
 
-The fine-tuned checkpoint obtains **94.03% VUN** and **1.466 FCD**.
+We release pretrained and fine-tuned MOSES checkpoints.
 
 ## Train Transport Loss
 
@@ -76,6 +76,8 @@ torchrun --standalone --nproc_per_node=4 \
 ```
 
 ## Evaluate FCD And Metrics
+
+We release [25,000 MOSES samples](https://github.com/m1balcerak/GraphEnergyMatching/releases/download/moses-samples-v1/gem_moses_samples_25k.csv) with **FCD 1.4136** and **VUN 93.656%**.
 
 By default, FCD uses the complete unfiltered internal validation split (the
 official MOSES `test_scaffolds.csv`). The evaluator writes JSON/CSV metrics and
