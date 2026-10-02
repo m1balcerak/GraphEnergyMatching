@@ -51,10 +51,11 @@ python sample_MOSES.py \
   --output samples.csv
 ```
 
-Sampling uses 225 fixed transport steps followed by `--mixing-steps` MCMC steps.
-The CSV contains SMILES and validity flags, with one row per generation attempt.
+Generated SMILES and validity flags are saved to `samples.csv`, with one row per generation attempt.
 
 ## Train Transport Loss
+
+The training pipeline consists of three stages: **a)** pretraining on corrupted graphs; **b)** calibrating the sampler to reach low-energy regions; **c)** contrastive fine-tuning to build energy barriers around the data manifold.
 
 Transport-loss pretraining uses `N=4` GPUs and a batch size of 128 per GPU:
 
